@@ -1,0 +1,12 @@
+__pycache__/
+*.pyc
+*.egg-info/
+.ipynb_checkpoints/
+
+# trained models and generated plots/reports are large/regenerable - track separately
+# (e.g. DVC, cloud storage) rather than in git
+models/*.keras
+outputs/
+
+.venv/
+venv/
