@@ -11,7 +11,7 @@ import time
 
 import pandas as pd
 
-from vehicle_classifier.config import ARCHITECTURE_CHOICES, DATA_ROOT, OUTPUTS_DIR, model_path
+from vehicle_classifier.config import ARCHITECTURE_CHOICES, DATA_ROOT, OUTPUTS_DIR, resolve_model_path
 from vehicle_classifier.data import discover_classes, load_and_clean, make_dataset, stratified_split
 from vehicle_classifier.evaluate import evaluate
 
@@ -33,7 +33,7 @@ def measure_inference_latency(architecture, data_root, n_repeats=20):
     sample_ds = make_dataset(p_test[:1], [0])
     x, _ = next(iter(sample_ds))
 
-    model = keras.models.load_model(model_path(architecture))
+    model = keras.models.load_model(resolve_model_path(architecture))
     model.predict(x, verbose=0)  # warm-up
 
     start = time.perf_counter()
@@ -47,7 +47,7 @@ def main():
     args = parse_args()
     OUTPUTS_DIR.mkdir(parents=True, exist_ok=True)
 
-    available = [a for a in args.architectures if model_path(a).exists()]
+    available = [a for a in args.architectures if resolve_model_path(a).exists()]
     missing = sorted(set(args.architectures) - set(available))
     if missing:
         print(f"skipping (no trained model found): {missing}")

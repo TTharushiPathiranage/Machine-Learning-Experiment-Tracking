@@ -4,7 +4,7 @@ Exposes per-architecture prediction and evaluation, plus a head-to-head
 comparison endpoint, over the two trained models (efficientnetb0, mobilenetv2).
 
 Run:
-    uvicorn api.main:app --reload
+    uvicorn app.main:app --reload
 
 Then open http://127.0.0.1:8000/docs for the interactive Swagger UI.
 """
@@ -19,9 +19,10 @@ from PIL import Image
 from pydantic import BaseModel
 
 from vehicle_classifier.compare import measure_inference_latency
-from vehicle_classifier.config import ARCHITECTURE_CHOICES, DATA_ROOT, model_path
+from vehicle_classifier.config import ARCHITECTURE_CHOICES, DATA_ROOT, resolve_model_path
 from vehicle_classifier.evaluate import evaluate as evaluate_architecture
 from vehicle_classifier.predict import VehicleClassifier
+from vehicle_classifier.tracking import latest_evaluation
 
 
 class Architecture(str, Enum):
@@ -66,7 +67,7 @@ app = FastAPI(
 
 
 def _require_trained(architecture: str) -> None:
-    if not model_path(architecture).exists():
+    if not resolve_model_path(architecture).exists():
         raise HTTPException(status_code=404, detail=f"no trained model found for architecture={architecture!r}")
 
 
@@ -118,12 +119,18 @@ def get_evaluation(architecture: Architecture):
 
 @app.get("/compare", response_model=ComparisonResponse, tags=["evaluate"])
 def compare_models():
-    """Evaluate both models on the same test split and compare them head-to-head."""
-    missing = [a for a in ARCHITECTURE_CHOICES if not model_path(a).exists()]
-    if missing:
-        raise HTTPException(status_code=409, detail=f"need a trained model for every architecture to compare; missing: {missing}")
+    """Compare both models head-to-head using each one's latest MLflow evaluation run.
 
-    results = {arch: _evaluate_with_latency(arch) for arch in ARCHITECTURE_CHOICES}
+    Produce those runs with `python -m vehicle_classifier.evaluate --architecture <arch>`.
+    """
+    results = {arch: latest_evaluation(arch) for arch in ARCHITECTURE_CHOICES}
+    missing = [a for a, r in results.items() if r is None]
+    if missing:
+        raise HTTPException(
+            status_code=409,
+            detail=f"no MLflow evaluation run for: {missing}; run `python -m vehicle_classifier.evaluate --architecture <arch>` first",
+        )
+
     best_by_accuracy = max(results, key=lambda a: results[a]["test_accuracy"])
     best_by_latency = min(results, key=lambda a: results[a]["inference_ms_per_image"])
 

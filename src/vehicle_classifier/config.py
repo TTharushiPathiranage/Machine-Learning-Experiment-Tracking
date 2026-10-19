@@ -13,6 +13,9 @@ OUTPUTS_DIR = PROJECT_ROOT / "outputs"
 
 CLASS_NAMES_PATH = MODELS_DIR / "class_names.json"
 
+MLFLOW_TRACKING_URI = f"sqlite:///{(PROJECT_ROOT / 'mlflow.db').as_posix()}"
+MLFLOW_EXPERIMENT = "vehicle-classifier"
+
 DEFAULT_ARCHITECTURE = "efficientnetb0"
 ARCHITECTURE_CHOICES = ("efficientnetb0", "mobilenetv2")
 
@@ -27,6 +30,18 @@ def best_head_path(architecture=DEFAULT_ARCHITECTURE):
 
 def best_finetuned_path(architecture=DEFAULT_ARCHITECTURE):
     return MODELS_DIR / f"best_finetuned_{architecture}.keras"
+
+
+def resolve_model_path(architecture=DEFAULT_ARCHITECTURE):
+    """Path to load for inference: the final model, else the best fine-tuned checkpoint.
+
+    Returns the final path even if nothing exists, so callers can report it.
+    """
+    final = model_path(architecture)
+    if final.exists():
+        return final
+    finetuned = best_finetuned_path(architecture)
+    return finetuned if finetuned.exists() else final
 
 
 # train/val/test split ratios, applied as in the original notebook:

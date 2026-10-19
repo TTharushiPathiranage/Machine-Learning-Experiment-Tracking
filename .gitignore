@@ -10,3 +10,8 @@ outputs/
 
 .venv/
 venv/
+
+# MLflow tracking store
+mlflow.db
+mlruns/
+.zen/

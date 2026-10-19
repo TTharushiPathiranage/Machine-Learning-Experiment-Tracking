@@ -16,7 +16,7 @@ import numpy as np
 from PIL import Image
 from tensorflow import keras
 
-from vehicle_classifier.config import ARCHITECTURE_CHOICES, CLASS_NAMES_PATH, DEFAULT_ARCHITECTURE, IMG_SIZE, model_path
+from vehicle_classifier.config import ARCHITECTURE_CHOICES, CLASS_NAMES_PATH, DEFAULT_ARCHITECTURE, IMG_SIZE, resolve_model_path
 
 
 class VehicleClassifier:
@@ -24,7 +24,7 @@ class VehicleClassifier:
 
     def __init__(self, architecture=DEFAULT_ARCHITECTURE, model_file=None, class_names_path=CLASS_NAMES_PATH):
         self.architecture = architecture
-        self.model = keras.models.load_model(model_file or model_path(architecture))
+        self.model = keras.models.load_model(model_file or resolve_model_path(architecture))
         with open(class_names_path) as f:
             self.class_names = json.load(f)
 

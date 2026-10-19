@@ -93,8 +93,8 @@ def load_and_clean(data_root=DATA_ROOT, class_names=None, verbose=True):
 
 def stratified_split(df, seed=SEED):
     """Split a cleaned DataFrame into stratified train/val/test path and label arrays."""
-    paths = df["path"].values
-    labels = df["label"].values
+    paths = df["path"].to_numpy(dtype=object)  # plain numpy: pandas 3 + pyarrow gives Arrow-backed .values that sklearn can't index
+    labels = df["label"].to_numpy()
 
     p_train, p_tmp, y_train, y_tmp = train_test_split(
         paths, labels, test_size=TEST_VAL_FRACTION, stratify=labels, random_state=seed

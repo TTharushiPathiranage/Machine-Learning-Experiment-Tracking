@@ -12,11 +12,13 @@ Usage:
 import argparse
 import json
 
+import mlflow
 from sklearn.metrics import classification_report, confusion_matrix, roc_auc_score
 from tensorflow import keras
 
-from vehicle_classifier.config import ARCHITECTURE_CHOICES, DATA_ROOT, DEFAULT_ARCHITECTURE, OUTPUTS_DIR, model_path
+from vehicle_classifier.config import ARCHITECTURE_CHOICES, DATA_ROOT, DEFAULT_ARCHITECTURE, OUTPUTS_DIR, resolve_model_path
 from vehicle_classifier.data import discover_classes, load_and_clean, make_dataset, stratified_split
+from vehicle_classifier.tracking import start_run
 
 
 def parse_args():
@@ -29,7 +31,7 @@ def parse_args():
 
 def evaluate(architecture, data_root=DATA_ROOT, model_file=None):
     """Returns a results dict; also usable as a library call from compare.py."""
-    model_file = model_file or model_path(architecture)
+    model_file = model_file or resolve_model_path(architecture)
     class_names = discover_classes(data_root)
     df = load_and_clean(data_root, class_names=class_names, verbose=False)
     _, _, (p_test, y_test) = stratified_split(df)
@@ -63,11 +65,29 @@ def evaluate(architecture, data_root=DATA_ROOT, model_file=None):
     }
 
 
+def evaluate_and_log(architecture, data_root=DATA_ROOT, model_file=None):
+    """Evaluate, add inference latency, and record everything as an MLflow evaluate run."""
+    from vehicle_classifier.compare import measure_inference_latency  # lazy: compare imports this module
+
+    with start_run(f"eval-{architecture}", stage="evaluate", params={"architecture": architecture, "data_root": str(data_root)}):
+        results = evaluate(architecture, data_root, model_file)
+        results["inference_ms_per_image"] = measure_inference_latency(architecture, data_root)
+        mlflow.log_dict(results, "results.json")
+        mlflow.log_metric("inference_ms_per_image", results["inference_ms_per_image"])
+        mlflow.log_params({"model_path": results["model_path"], "num_params": results["num_params"]})
+        mlflow.log_metrics({"test_loss": results["test_loss"], "test_accuracy": results["test_accuracy"]})
+        if results["macro_roc_auc"] is not None:
+            mlflow.log_metric("macro_roc_auc", results["macro_roc_auc"])
+        mlflow.log_dict(results["classification_report"], "classification_report.json")
+        mlflow.log_dict({"labels": results["class_names"], "matrix": results["confusion_matrix"]}, "confusion_matrix.json")
+    return results
+
+
 def main():
     args = parse_args()
     OUTPUTS_DIR.mkdir(parents=True, exist_ok=True)
 
-    results = evaluate(args.architecture, args.data_root, args.model_path)
+    results = evaluate_and_log(args.architecture, args.data_root, args.model_path)
 
     print(f"Test loss     {results['test_loss']:.4f}")
     print(f"Test accuracy {results['test_accuracy']:.4f}")
